@@ -1,0 +1,17 @@
+# OS / Editor
+.DS_Store
+*.swp
+*.swo
+.vscode/
+.idea/
+
+# Rust (chatbot/)
+target/
+
+# Go (golangBackendServices/)
+golangBackendServices/bin/
+golangBackendServices/dist/
+
+# Logs & temp
+*.log
+tmp/
