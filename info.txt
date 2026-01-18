@@ -1,0 +1,141 @@
+docker pull immauss/openvas
+docker images immauss/openvas
+docker run -d \
+  --name openvas \
+  -p 9392:9392 \
+  immauss/openvas
+  starts new container from images
+  -d runs in detached mode(in background)
+
+  --name gives name
+    -p 9392:9392 
+  maps  host port 9392 to  container port 9392 access web at https://localhost:9392
+
+  after running the container it prints container id
+  Every container gets a unique id(long sha like string)
+
+  docker ps show containers
+  docker logs <container-id> #show logs
+docker stops <container-id> #stops it
+docker rm <container-id>  #removes it
+access web ui at http://127.0.0.1:9392/login
+access credentials     docker logs openvas | grep -i password
+
+docker exec -it openvas bash
+runuser -u gvm -- gvmd --user=admin --new-password='YourStrongPassword123!'
+runuser -u gvm -- bash
+openvas has brain process called gvmd 
+gvmd understands special language called GMP
+GMP messages are written in xml
+gmv-cli messages->It opens a connections to brain(TLS to 127.0.0.1:9390)
+logs with auth
+sends request in format of xml
+prints XML response
+gvm-cli --gmp-username admin --gmp-password 'YourStrongPassword123!' \
+  tls --hostname 127.0.0.1 --port 9390 --xml "<get_version/>"
+
+
+
+  final
+  docker exec -it openvas bash
+runuser -u gvm -- bash
+gvm-cli --gmp-username admin --gmp-password 'YourStrongPassword123!' \
+  tls --hostname 127.0.0.1 --port 9390 --xml "<get_version/>"
+
+
+  docker exec -it openvas bash
+Enters the running OpenVAS container named openvas.
+You get an interactive bash shell inside that container as root.
+
+
+runuser -u gvm -- bash
+Inside the container, this switches from root to the gvm user and starts a new bash shell.
+gvm is the non‑root account meant to run GVM tools safely.
+
+
+
+gvm-cli --gmp-username admin --gmp-password 'YourStrongPassword123!' tls --hostname 127.0.0.1 --port 9390 --xml "<get_version/>"
+gvm-cli opens a TLS connection to the GVM manager (gvmd) on 127.0.0.1:9390 inside the container.
+Logs in as the GMP user admin with your password.
+Sends the XML command <get_version/> asking “what version are you?”.
+gvmd replies with XML like <get_version_response ...><version>22.7</version></get_version_response>, which you see printed.
+
+
+
+Step 1: enter container shell has root
+docker exec -it openvas bash
+Attaches an interactive bash shell to the running container named openvas.
+You are now inside that container as root (root@<container-id>:/#).
+
+Step 2:switch to the non-root gvm user:
+Starts a new bash shell as the gvm user.
+gvm is the account meant to run GVM tools; gvm-cli refuses to run as root.\
+
+
+Step3:end a simple GMP command (get_version) to gvmd
+gvm-cli --gmp-username admin --gmp-password 'YourStrongPassword123!' \
+  tls --hostname 127.0.0.1 --port 9390 --xml "<get_version/>"
+
+Step4:list all scan configs
+gvm-cli --gmp-username admin --gmp-password 'YourStrongPassword123!' \
+  tls --hostname 127.0.0.1 --port 9390 --xml "<get_configs/>"
+  From the XML output you saw multiple <config> blocks, including:
+<config id="daba56c8-73ec-11df-a475-002264764cea">  <name>Full and fast</name>  ...</config>
+This id="daba56c8-73ec-11df-a475-002264764cea" is the scan configuration ID for “Full and fast”.
+It defines how the scan runs (which NVTs, intensity, etc.).
+You’ll reference this ID when creating a task.
+
+Step5:Create a target for redbus.in on port 62078
+gvm-cli --gmp-username admin --gmp-password 'YourStrongPassword123!' \
+  tls --hostname 127.0.0.1 --port 9390 --xml "\
+<create_target>
+  <name>redbus_62078</name>
+  <hosts>redbus.in</hosts>
+  <port_range>62078</port_range>
+</create_target>"
+we get target id
+9593/
+
+
+Step6:– create the task
+gvm-cli --gmp-username admin --gmp-password 'YourStrongPassword123!' \
+  tls --hostname 127.0.0.1 --port 9390 --xml "\
+<create_task>
+  <name>redbus_62078_task</name>
+  <config id='daba56c8-73ec-11df-a475-002264764cea'/>
+  <target id='2391a8f1-6308-4054-a19a-7a571f5734b8'/>
+</create_task>"
+response is task id
+
+Step 7:Start the vulnerability scan (task)
+Command 7 – start the task by ID:
+gvm-cli --gmp-username admin --gmp-password 'YourStrongPassword123!' \  tls --hostname 127.0.0.1 --port 9390 --xml "\<start_task task_id='612e6f79-e7a6-4b32-b33d-9b535206b9a5'/>"
+gvm-cli --gmp-username admin --gmp-password 'YourStrongPassword123!' \
+  tls --hostname 127.0.0.1 --port 9390 --xml "\
+<start_task task_id='612e6f79-e7a6-4b32-b33d-9b535206b9a5'/>"
+
+
+gvm-cli --gmp-username admin --gmp-password 'YourStrongPassword123!' \
+  tls --hostname 127.0.0.1 --port 9390 --xml "\
+<start_task task_id='3d0f6850-6e5b-4d32-b323-40f8b62dbc1b'/>"
+
+
+Step8:Check task status: see if the task is still running or done:
+gvm-cli --gmp-username admin --gmp-password 'YourStrongPassword123!' \
+  tls --hostname 127.0.0.1 --port 9390 --xml "\
+<get_tasks task_id='612e6f79-e7a6-4b32-b33d-9b535206b9a5' details='1'/>"
+
+
+Step 9:Fetch the final report for that run
+gvm-cli --gmp-username admin --gmp-password 'YourStrongPassword123!' \
+  tls --hostname 127.0.0.1 --port 9390 --xml "\
+<get_reports report_id='bf251f56-ed89-46a6-b1ac-d83931b2eb7c' details='1'/>"
+
+
+Entered the OpenVAS container and used the GVM CLI (gvm-cli) as the gvm user.
+Talked to the GVM manager (gvmd) over TLS on port 9390 using GMP, which is an XML-based protocol.
+Chose a scan profile (“Full and fast”) via its config ID.
+Defined a target (redbus.in on port 62078) and got its target ID.
+Created a task (config + target) and got its task ID.
+Started the task, which launched a vulnerability scan.
+Polled task status and downloaded the report for that specific run using the report ID.

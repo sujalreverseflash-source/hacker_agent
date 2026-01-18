@@ -431,4 +431,3 @@ This gives the AI a **structured view** of the results plus the **raw Nmap outpu
    - Require confirmation or specific configuration for more aggressive scans.
 
 Once these are implemented, this README serves as the **contract** describing what each tool does and how an AI (or a human) can use them. 
-
