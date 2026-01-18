@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"os/exec"
 	"strings"
+
+	"github.com/joho/godotenv"
 )
 
 type scanRequest struct {
@@ -55,8 +57,16 @@ func scanOpenPortsHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	// Load environment variables from .env so OpenVAS auth/config
+	// is available without manually exporting each time.
+	_ = godotenv.Load(".env")
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("/scan-open-ports", scanOpenPortsHandler)
+
+	// Modular OpenVAS "get version" API.
+	openVASService := NewOpenVASServiceFromEnv()
+	mux.Handle("/openvas/version", openVASVersionHandler(openVASService))
 
 	addr := ":8080"
 	log.Printf("Go backend listening on %s", addr)
