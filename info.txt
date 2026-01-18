@@ -139,3 +139,21 @@ Defined a target (redbus.in on port 62078) and got its target ID.
 Created a task (config + target) and got its task ID.
 Started the task, which launched a vulnerability scan.
 Polled task status and downloaded the report for that specific run using the report ID.
+
+
+go run .
+
+
+apis
+
+1)Nmap open ports scan
+Method: POST
+URL: http://localhost:8080/scan-open-ports
+Body (JSON):
+    {
+      "target": "scanme.nmap.org"
+    }
+2)OpenVAS get version
+Method: GET
+URL: http://localhost:8080/openvas/version
+Body: none (just a GET)
