@@ -157,3 +157,4 @@ Body (JSON):
 Method: GET
 URL: http://localhost:8080/openvas/version
 Body: none (just a GET)
+Polled task status and downloaded the report for that specific run using the report ID.
