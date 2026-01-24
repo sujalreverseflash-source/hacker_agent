@@ -64,9 +64,10 @@ func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/scan-open-ports", scanOpenPortsHandler)
 
-	// Modular OpenVAS "get version" API.
+	// Modular OpenVAS APIs.
 	openVASService := NewOpenVASServiceFromEnv()
 	mux.Handle("/openvas/version", openVASVersionHandler(openVASService))
+	mux.Handle("/openvas/configs", openVASConfigsHandler(openVASService))
 
 	addr := ":8080"
 	log.Printf("Go backend listening on %s", addr)

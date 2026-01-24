@@ -87,3 +87,32 @@ func (s *OpenVASService) GetVersion(ctx context.Context) (string, error) {
 
 	return string(out), nil
 }
+
+// GetConfigs calls gvm-cli with <get_configs/> and returns the raw XML
+// response listing all available scan configurations.
+func (s *OpenVASService) GetConfigs(ctx context.Context) (string, error) {
+	if s.Password == "" {
+		return "", fmt.Errorf("GVM_PASSWORD is not set")
+	}
+
+	args := []string{
+		"exec",
+		"-u", "gvm",
+		s.ContainerName,
+		"gvm-cli",
+		"--gmp-username", s.Username,
+		"--gmp-password", s.Password,
+		"tls",
+		"--hostname", s.Host,
+		"--port", s.Port,
+		"--xml", "<get_configs/>",
+	}
+
+	cmd := exec.CommandContext(ctx, "docker", args...)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("gvm-cli get_configs failed: %w; output: %s", err, string(out))
+	}
+
+	return string(out), nil
+}

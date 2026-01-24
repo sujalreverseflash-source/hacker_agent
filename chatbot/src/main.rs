@@ -10,6 +10,7 @@ use tokio::io::{self, AsyncBufReadExt, AsyncWriteExt, BufReader};
 mod api;
 mod services;
 mod tools;
+mod prompts;
 
 /// Basic JSON-RPC-like request type.
 #[derive(Debug, Deserialize)]
@@ -175,6 +176,9 @@ async fn handle_request(registry: Arc<ToolRegistry>, id: Value, req: RpcRequest)
                     "capabilities": {
                         "tools": {
                             "listChanged": true
+                        },
+                        "prompts": {
+                            "listChanged": true
                         }
                     },
                     "serverInfo": {
@@ -200,6 +204,24 @@ async fn handle_request(registry: Arc<ToolRegistry>, id: Value, req: RpcRequest)
             match registry.call(&params.name, params.input).await {
                 Ok(value) => ok(id, json!({ "output": value })),
                 Err(err) => err_resp(id, -32000, format!("Tool error: {err}")),
+            }
+        }
+        "prompts/list" => {
+            let prompts = prompts::list_prompts();
+            ok(id, json!({ "prompts": prompts }))
+        }
+        "prompts/get" => {
+            let parsed: Result<prompts::PromptGetParams, _> = serde_json::from_value(req.params);
+            let params = match parsed {
+                Ok(p) => p,
+                Err(err) => {
+                    return err_resp(id, -32602, format!("Invalid params: {err}"));
+                }
+            };
+
+            match prompts::get_prompt(&params.name, params.arguments) {
+                Ok(prompt) => ok(id, json!({ "prompt": prompt })),
+                Err(err) => err_resp(id, -32601, format!("Prompt not found: {err}")),
             }
         }
         _ => err_resp(
