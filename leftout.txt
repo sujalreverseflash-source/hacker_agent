@@ -1,0 +1,166 @@
+# Implementation Gap Analysis - Nmap & OpenVAS
+# Generated: 2026-01-30
+
+================================================================================
+                              OPENVAS STATUS
+================================================================================
+
+Status: COMPLETE (100%)
+
+All 7 tools required for end-to-end vulnerability assessment are implemented:
+
+1. openvas_get_version      - Verify connectivity to GVM
+2. openvas_list_scan_configs - Get available scan profiles
+3. openvas_create_target    - Define target host/IP/CIDR
+4. openvas_create_task      - Create task with config + target
+5. openvas_start_task       - Start the vulnerability scan
+6. openvas_task_status      - Poll for scan completion
+7. openvas_get_report       - Retrieve final vulnerability report
+
+No gaps identified.
+
+================================================================================
+                               NMAP STATUS
+================================================================================
+
+Status: PARTIAL (95% Complete)
+
+--------------------------------------------------------------------------------
+IMPLEMENTED FEATURES:
+--------------------------------------------------------------------------------
+
+Scan Types (all 8 supported):
+  - ping        (-sn)
+  - tcp_syn     (-sS)
+  - tcp_connect (-sT)
+  - udp         (-sU)
+  - tcp_ack     (-sA)
+  - tcp_fin     (-sF)
+  - tcp_null    (-sN)
+  - tcp_xmas    (-sX)
+
+Timing Templates (all 6 supported):
+  - T0 (Paranoid)
+  - T1 (Sneaky)
+  - T2 (Polite)
+  - T3 (Normal)
+  - T4 (Aggressive)
+  - T5 (Insane)
+
+Options (all implemented):
+  - Port specification (-p)
+  - Service detection (-sV)
+  - OS detection (-O)
+  - Script scanning (-sC, --script)
+  - Aggressive mode (-A)
+  - Traceroute (--traceroute)
+  - Output formats (xml, json, greppable, all)
+
+Direct Flags (all implemented):
+  - flag_o          (-O)
+  - flag_sc         (-sC)
+  - flag_sv         (-sV)
+  - flag_traceroute (--traceroute)
+  - flag_a          (-A)
+
+MCP Tools (6 tools):
+  - nmap_open_ports     - Simple port scan
+  - advanced_nmap_scan  - Full configurable scan
+  - quick_scan          - Preset scan patterns
+  - stealth_scan        - Evasion techniques (PARTIAL)
+  - comprehensive_scan  - All 65535 ports + scripts
+  - network_discovery   - Subnet enumeration
+
+--------------------------------------------------------------------------------
+GAP: STEALTH OPTIONS NOT IMPLEMENTED IN GO BACKEND
+--------------------------------------------------------------------------------
+
+Location: golangBackendServices/main.go
+
+The following stealth_options are defined in the Rust tool schema
+(chatbot/src/tools/advanced_nmap_tool.rs) and passed to the Go backend,
+but the Go backend does NOT process them:
+
+| Option          | Nmap Flag                  | Status          |
+|-----------------|----------------------------|-----------------|
+| decoys          | -D RND:10,ME,8.8.8.8       | NOT IMPLEMENTED |
+| source_port     | --source-port 53           | NOT IMPLEMENTED |
+| interface       | -e eth0                    | NOT IMPLEMENTED |
+| ttl             | --ttl 64                   | NOT IMPLEMENTED |
+| randomize_hosts | --randomize-hosts          | NOT IMPLEMENTED |
+| spoof_ip        | -S 192.168.1.1             | NOT IMPLEMENTED |
+| spoof_mac       | --spoof-mac 0              | NOT IMPLEMENTED |
+| fragment_packets| -f                         | NOT IMPLEMENTED |
+
+These options are accepted in scanRequest struct but never added to cmdArgs.
+
+--------------------------------------------------------------------------------
+FIX REQUIRED:
+--------------------------------------------------------------------------------
+
+In golangBackendServices/main.go, add processing for stealth_options after
+line 145 (after traceroute handling):
+
+```go
+// Process stealth options
+if req.StealthOptions != nil {
+    // Decoys
+    if decoys, ok := req.StealthOptions["decoys"].([]interface{}); ok && len(decoys) > 0 {
+        var decoyStrs []string
+        for _, d := range decoys {
+            if ds, ok := d.(string); ok {
+                decoyStrs = append(decoyStrs, ds)
+            }
+        }
+        if len(decoyStrs) > 0 {
+            cmdArgs = append(cmdArgs, "-D", strings.Join(decoyStrs, ","))
+        }
+    }
+    
+    // Source port
+    if sourcePort, ok := req.StealthOptions["source_port"].(float64); ok {
+        cmdArgs = append(cmdArgs, "--source-port", fmt.Sprintf("%d", int(sourcePort)))
+    }
+    
+    // Interface
+    if iface, ok := req.StealthOptions["interface"].(string); ok && iface != "" {
+        cmdArgs = append(cmdArgs, "-e", iface)
+    }
+    
+    // TTL
+    if ttl, ok := req.StealthOptions["ttl"].(float64); ok {
+        cmdArgs = append(cmdArgs, "--ttl", fmt.Sprintf("%d", int(ttl)))
+    }
+    
+    // Randomize hosts
+    if randomize, ok := req.StealthOptions["randomize_hosts"].(bool); ok && randomize {
+        cmdArgs = append(cmdArgs, "--randomize-hosts")
+    }
+    
+    // Spoof IP
+    if spoofIP, ok := req.StealthOptions["spoof_ip"].(string); ok && spoofIP != "" {
+        cmdArgs = append(cmdArgs, "-S", spoofIP)
+    }
+    
+    // Spoof MAC
+    if spoofMAC, ok := req.StealthOptions["spoof_mac"].(string); ok && spoofMAC != "" {
+        cmdArgs = append(cmdArgs, "--spoof-mac", spoofMAC)
+    }
+    
+    // Fragment packets
+    if fragment, ok := req.StealthOptions["fragment_packets"].(bool); ok && fragment {
+        cmdArgs = append(cmdArgs, "-f")
+    }
+}
+```
+
+================================================================================
+                              SUMMARY
+================================================================================
+
+| Component | Completion | Action Required                    |
+|-----------|------------|-----------------------------------|
+| OpenVAS   | 100%       | None                              |
+| Nmap      | 95%        | Implement stealth_options in Go   |
+
+================================================================================
