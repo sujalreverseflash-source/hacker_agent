@@ -77,6 +77,7 @@ pub async fn advanced_nmap_scan(
 }
 
 /// Quick scan presets for common scenarios
+/// Note: Uses tcp_connect instead of tcp_syn to avoid requiring root privileges
 pub async fn quick_scan(target: &str, scan_type: &str, timing: &str) -> Result<Value> {
     let body = match scan_type {
         "ping_sweep" => json!({
@@ -87,21 +88,20 @@ pub async fn quick_scan(target: &str, scan_type: &str, timing: &str) -> Result<V
         "common_ports" => json!({
             "target": target,
             "timing": timing,
-            "scan_type": "tcp_syn",
+            "scan_type": "tcp_connect",
             "ports": "1-1000",
             "service_detection": true
         }),
         "service_detection" => json!({
             "target": target,
             "timing": timing,
-            "scan_type": "tcp_syn",
-            "service_detection": true,
-            "os_detection": true
+            "scan_type": "tcp_connect",
+            "service_detection": true
         }),
         "vuln_scan" => json!({
             "target": target,
             "timing": timing,
-            "scan_type": "tcp_syn",
+            "scan_type": "tcp_connect",
             "service_detection": true,
             "scripts": "vuln"
         }),
@@ -160,29 +160,28 @@ pub async fn stealth_scan(
     nmap::advanced_scan(&body).await
 }
 
-/// Comprehensive scan with multiple techniques
+/// Comprehensive scan with multiple techniques - scans all 65535 ports
+/// Note: OS detection (-O) requires root privileges, so it's disabled by default
 pub async fn comprehensive_scan(target: &str, include_vuln: bool) -> Result<Value> {
     let body = json!({
         "target": target,
         "timing": "T3",
-        "scan_type": "tcp_syn",
+        "scan_type": "tcp_connect",
         "ports": "1-65535",
         "service_detection": true,
-        "os_detection": true,
-        "scripts": if include_vuln { "default,vuln" } else { "default" },
-        "output_format": "xml"
+        "scripts": if include_vuln { "default,vuln" } else { "default" }
     });
 
     nmap::advanced_scan(&body).await
 }
 
 /// Network discovery scan for subnet enumeration
+/// Uses ping scan to find live hosts (no port specification allowed with -sn)
 pub async fn network_discovery(subnet: &str, timing: &str) -> Result<Value> {
     let body = json!({
         "target": subnet,
         "timing": timing,
-        "scan_type": "ping",
-        "ports": "22,80,443,3389,8080"
+        "scan_type": "ping"
     });
 
     nmap::advanced_scan(&body).await

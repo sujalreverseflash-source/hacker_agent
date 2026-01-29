@@ -283,3 +283,92 @@ impl Tool for StealthScanTool {
         advanced_nmap_scan::stealth_scan(target, stealth_level, scan_type, use_decoys, fragment_packets).await
     }
 }
+
+/// Comprehensive scan tool - full port scan with service/OS detection
+pub struct ComprehensiveScanTool;
+
+#[async_trait::async_trait]
+impl Tool for ComprehensiveScanTool {
+    fn name(&self) -> &'static str {
+        "comprehensive_scan"
+    }
+
+    fn description(&self) -> &'static str {
+        "Full comprehensive scan: all 65535 ports with service detection, OS detection, and scripts. Use for thorough security assessment."
+    }
+
+    fn input_schema(&self) -> serde_json::Value {
+        serde_json::json!({
+            "type": "object",
+            "properties": {
+                "target": {
+                    "type": "string",
+                    "description": "Target hostname or IP address to scan."
+                },
+                "include_vuln": {
+                    "type": "boolean",
+                    "description": "Include vulnerability scripts (vuln category). Default: false",
+                    "default": false
+                }
+            },
+            "required": ["target"],
+            "additionalProperties": false
+        })
+    }
+
+    async fn execute(&self, input: Value) -> Result<Value> {
+        let target = input
+            .get("target")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow::anyhow!("missing required field `target`"))?;
+
+        let include_vuln = input.get("include_vuln").and_then(|v| v.as_bool()).unwrap_or(false);
+
+        advanced_nmap_scan::comprehensive_scan(target, include_vuln).await
+    }
+}
+
+/// Network discovery tool - subnet enumeration
+pub struct NetworkDiscoveryTool;
+
+#[async_trait::async_trait]
+impl Tool for NetworkDiscoveryTool {
+    fn name(&self) -> &'static str {
+        "network_discovery"
+    }
+
+    fn description(&self) -> &'static str {
+        "Network discovery scan for subnet enumeration. Finds live hosts and checks common ports (22, 80, 443, 3389, 8080)."
+    }
+
+    fn input_schema(&self) -> serde_json::Value {
+        serde_json::json!({
+            "type": "object",
+            "properties": {
+                "subnet": {
+                    "type": "string",
+                    "description": "Target subnet in CIDR notation (e.g., '192.168.1.0/24') or IP range."
+                },
+                "timing": {
+                    "type": "string",
+                    "description": "Timing template: T3 (Normal) or T4 (Aggressive). Default: T4",
+                    "enum": ["T3", "T4"],
+                    "default": "T4"
+                }
+            },
+            "required": ["subnet"],
+            "additionalProperties": false
+        })
+    }
+
+    async fn execute(&self, input: Value) -> Result<Value> {
+        let subnet = input
+            .get("subnet")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow::anyhow!("missing required field `subnet`"))?;
+
+        let timing = input.get("timing").and_then(|v| v.as_str()).unwrap_or("T4");
+
+        advanced_nmap_scan::network_discovery(subnet, timing).await
+    }
+}

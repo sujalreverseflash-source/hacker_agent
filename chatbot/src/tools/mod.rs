@@ -18,6 +18,8 @@ pub fn register_all_tools(registry: &mut ToolRegistry) {
     registry.register(advanced_nmap_tool::AdvancedNmapTool);
     registry.register(advanced_nmap_tool::QuickScanTool);
     registry.register(advanced_nmap_tool::StealthScanTool);
+    registry.register(advanced_nmap_tool::ComprehensiveScanTool);
+    registry.register(advanced_nmap_tool::NetworkDiscoveryTool);
     registry.register(openvas_get_version_tool::OpenVASGetVersionTool);
     registry.register(openvas_list_configs_tool::OpenVASListConfigsTool);
     registry.register(openvas_create_target_tool::OpenVASCreateTargetTool);

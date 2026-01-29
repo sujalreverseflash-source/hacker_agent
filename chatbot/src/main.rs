@@ -11,7 +11,6 @@ mod api;
 mod services;
 mod tools;
 mod prompts;
-mod models;
 
 /// Basic JSON-RPC-like request type.
 #[derive(Debug, Deserialize)]
