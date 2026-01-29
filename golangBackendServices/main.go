@@ -68,6 +68,11 @@ func main() {
 	openVASService := NewOpenVASServiceFromEnv()
 	mux.Handle("/openvas/version", openVASVersionHandler(openVASService))
 	mux.Handle("/openvas/configs", openVASConfigsHandler(openVASService))
+	mux.Handle("/openvas/targets", openVASCreateTargetHandler(openVASService))
+	mux.Handle("/openvas/tasks", openVASCreateTaskHandler(openVASService))
+	mux.Handle("/openvas/tasks/start", openVASStartTaskHandler(openVASService))
+	mux.Handle("/openvas/tasks/status", openVASTaskStatusHandler(openVASService))
+	mux.Handle("/openvas/reports", openVASGetReportHandler(openVASService))
 
 	addr := ":8080"
 	log.Printf("Go backend listening on %s", addr)
