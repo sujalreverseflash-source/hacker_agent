@@ -184,7 +184,7 @@ func main() {
 	mux.Handle("/openvas/tasks/status", openVASTaskStatusHandler(openVASService))
 	mux.Handle("/openvas/reports", openVASGetReportHandler(openVASService))
 
-	addr := ":8081"
+	addr := ":8080"
 	log.Printf("Go backend listening on %s", addr)
 	if err := http.ListenAndServe(addr, mux); err != nil {
 		log.Fatalf("server failed: %v", err)

@@ -1,3 +1,4 @@
+
 use anyhow::Result;
 use serde_json::{json, Value};
 
@@ -6,7 +7,7 @@ pub async fn advanced_scan(request_body: &Value) -> Result<Value> {
     let client = reqwest::Client::new();
     
     let resp = client
-        .post("http://127.0.0.1:8081/scan-open-ports")
+        .post("http://127.0.0.1:8080/scan-open-ports")
         .json(request_body)
         .send()
         .await?
