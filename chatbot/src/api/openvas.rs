@@ -8,7 +8,7 @@ use serde_json::Value;
 pub async fn get_version() -> Result<Value> {
     let client = reqwest::Client::new();
     let resp = client
-        .get("http://127.0.0.1:8080/openvas/version")
+        .get("http://127.0.0.1:8081/openvas/version")
         .send()
         .await?
         .error_for_status()?;
@@ -28,7 +28,7 @@ pub async fn get_version() -> Result<Value> {
 pub async fn list_configs() -> Result<Value> {
     let client = reqwest::Client::new();
     let resp = client
-        .get("http://127.0.0.1:8080/openvas/configs")
+        .get("http://127.0.0.1:8081/openvas/configs")
         .send()
         .await?
         .error_for_status()?;
