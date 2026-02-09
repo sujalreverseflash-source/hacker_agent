@@ -124,7 +124,7 @@ Step8:Check task status: see if the task is still running or done:
 gvm-cli --gmp-username admin --gmp-password 'YourStrongPassword123!' \
   tls --hostname 127.0.0.1 --port 9390 --xml "\
 <get_tasks task_id='612e6f79-e7a6-4b32-b33d-9b535206b9a5' details='1'/>"
-
+195dfbd8-75d6-4e22-85e3-01e1995fcca2
 
 Step 9:Fetch the final report for that run
 gvm-cli --gmp-username admin --gmp-password 'YourStrongPassword123!' \
@@ -153,8 +153,127 @@ Body (JSON):
     {
       "target": "scanme.nmap.org"
     }
+
+1.1)Nmap open ports scan (SSE stream)
+Method: POST
+URL: http://localhost:8080/scan-open-ports/stream
+Response: text/event-stream (SSE)
+Notes:
+  - Streams live stdout/stderr lines as events until done
+  - Events: ready, output, error, done
+Example curl:
+  curl -N -X POST "http://localhost:8080/scan-open-ports/stream" \
+    -H "Content-Type: application/json" \
+    -d '{"target":"scanme.nmap.org","timing":"T5"}'
+
 2)OpenVAS get version
 Method: GET
 URL: http://localhost:8080/openvas/version
 Body: none (just a GET)
 Polled task status and downloaded the report for that specific run using the report ID.
+
+2.1)OpenVAS list scan configs
+Method: GET
+URL: http://localhost:8080/openvas/configs
+
+2.2)OpenVAS create target
+Method: POST
+URL: http://localhost:8080/openvas/targets
+Body (JSON):
+  {
+    "name": "my_target",
+    "hosts": "example.com",
+    "port_range": "62078"
+  }
+
+2.3)OpenVAS create task
+Method: POST
+URL: http://localhost:8080/openvas/tasks
+Body (JSON):
+  {
+    "name": "my_task",
+    "config_id": "<config-id>",
+    "target_id": "<target-id>"
+  }
+
+2.4)OpenVAS start task
+Method: POST
+URL: http://localhost:8080/openvas/tasks/start
+Body (JSON):
+  {
+    "task_id": "<task-id>"
+  }
+
+2.5)OpenVAS task status (non-stream)
+Method: POST
+URL: http://localhost:8080/openvas/tasks/status
+Body (JSON):
+  {
+    "task_id": "<task-id>"
+  }
+Response (JSON):
+  {
+    "task_id": "...",
+    "response_raw": "<get_tasks_response XML>",
+    "parsed": {
+      "status": "...",
+      "done": true|false,
+      "progress": 0-100,
+      "total": 100,
+      "message": "...",
+      "report_id": "..."
+    }
+  }
+
+2.6)OpenVAS task progress (SSE stream)
+Method: GET
+URL: http://localhost:8080/openvas/tasks/progress?task_id=<task-id>&interval_seconds=2
+Response: text/event-stream (SSE)
+Notes:
+  - Polls gvmd internally and streams parsed progress/status until done
+  - Events: ready, progress, error, done
+
+2.7)OpenVAS get report
+Method: POST
+URL: http://localhost:8080/openvas/reports
+Body (JSON):
+  {
+    "report_id": "<report-id>"
+  }
+
+
+3)Amass (subdomain enumeration)
+
+3.1)Get Amass version
+Method: GET
+URL: http://localhost:8080/amass/version
+
+3.2)Amass enum (passive/active) with optional file saving (txt/json)
+Method: POST
+URL: http://localhost:8080/amass/enum
+Body (JSON):
+  Required:
+    - domain: "example.com"
+
+  Optional:
+    - mode: "passive" | "active"              (default: "passive")
+    - output_format: "txt" | "json"           (default: "txt")
+    - save_to_file: true | false              (default: false)
+    - output_file: "my-results.json|txt"      (optional; filename only, saved under ./outputs/)
+    - context_timeout_seconds: 1800           (kills process after N seconds)
+
+Example (passive, return TXT in response):
+{
+  "domain": "example.com",
+  "mode": "passive",
+  "output_format": "txt"
+}
+
+Example (active, save JSON to file AND return JSON in response):
+{
+  "domain": "example.com",
+  "mode": "active",
+  "output_format": "json",
+  "save_to_file": true,
+  "output_file": "example-amass.json"
+}

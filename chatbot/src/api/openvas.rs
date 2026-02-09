@@ -1,5 +1,7 @@
 use anyhow::Result;
 use serde_json::{Map, Value};
+use tokio::sync::mpsc;
+use futures_util::StreamExt;
 
 /// Low-level HTTP client for talking to the Go OpenVAS backend.
 /// Currently exposes:
@@ -171,5 +173,89 @@ pub async fn get_report(report_id: &str) -> Result<Value> {
 
     let body: Value = resp.json().await?;
     Ok(body)
+}
+
+#[derive(Debug, Clone)]
+pub enum OpenVASTaskProgressEvent {
+    Ready(Value),
+    Progress(Value),
+    Done(Value),
+}
+
+/// Stream task progress from the Go backend (SSE).
+///
+/// GET /openvas/tasks/progress?task_id=...&interval_seconds=2
+pub async fn task_progress_stream(
+    task_id: &str,
+    interval_seconds: Option<u64>,
+) -> Result<mpsc::Receiver<OpenVASTaskProgressEvent>> {
+    let client = reqwest::Client::new();
+
+    let mut url = format!("http://127.0.0.1:8080/openvas/tasks/progress?task_id={}", task_id);
+    if let Some(s) = interval_seconds {
+        url.push_str(&format!("&interval_seconds={}", s));
+    }
+
+    let resp = client.get(url).send().await?.error_for_status()?;
+
+    let (tx, rx) = mpsc::channel::<OpenVASTaskProgressEvent>(512);
+
+    tokio::spawn(async move {
+        let mut bytes = resp.bytes_stream();
+        let mut buf = String::new();
+        let mut cur_event: Option<String> = None;
+        let mut cur_data: Vec<String> = Vec::new();
+
+        while let Some(chunk) = bytes.next().await {
+            let Ok(chunk) = chunk else { break };
+            let s = String::from_utf8_lossy(&chunk);
+            buf.push_str(&s);
+
+            while let Some(pos) = buf.find('\n') {
+                let mut line = buf[..pos].to_string();
+                buf.drain(..=pos);
+                if line.ends_with('\r') {
+                    line.pop();
+                }
+
+                if line.is_empty() {
+                    if let Some(ev) = cur_event.take() {
+                        let data = cur_data.join("\n");
+                        cur_data.clear();
+
+                        if let Ok(v) = serde_json::from_str::<Value>(&data) {
+                            match ev.as_str() {
+                                "ready" => {
+                                    let _ = tx.send(OpenVASTaskProgressEvent::Ready(v)).await;
+                                }
+                                "progress" => {
+                                    let _ = tx.send(OpenVASTaskProgressEvent::Progress(v)).await;
+                                }
+                                "done" => {
+                                    let _ = tx.send(OpenVASTaskProgressEvent::Done(v)).await;
+                                    return;
+                                }
+                                _ => {}
+                            }
+                        }
+                    } else {
+                        cur_data.clear();
+                    }
+                    continue;
+                }
+
+                if let Some(rest) = line.strip_prefix("event:") {
+                    cur_event = Some(rest.trim().to_string());
+                    continue;
+                }
+                if let Some(rest) = line.strip_prefix("data:") {
+                    cur_data.push(rest.trim_start().to_string());
+                    continue;
+                }
+            }
+        }
+    });
+
+    Ok(rx)
 }
 

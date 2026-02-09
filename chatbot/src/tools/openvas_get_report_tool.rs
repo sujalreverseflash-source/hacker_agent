@@ -3,6 +3,7 @@ use serde_json::Value;
 
 use crate::services::openvas_get_report;
 use crate::Tool;
+use crate::ExecutionContext;
 
 /// Tool that fetches the final OpenVAS/GVM report by report ID via the Go
 /// backend and returns the raw get_reports_response XML.
@@ -32,7 +33,7 @@ impl Tool for OpenVASGetReportTool {
         })
     }
 
-    async fn execute(&self, input: Value) -> Result<Value> {
+    async fn execute(&self, input: Value, _ctx: ExecutionContext) -> Result<Value> {
         let report_id = input
             .get("report_id")
             .and_then(|v| v.as_str())

@@ -2,6 +2,7 @@ use anyhow::Result;
 use serde_json::Value;
 
 use crate::Tool;
+use crate::ExecutionContext;
 
 /// Simple echo tool used mainly for testing the MCP plumbing.
 pub struct EchoTool;
@@ -23,7 +24,7 @@ impl Tool for EchoTool {
         })
     }
 
-    async fn execute(&self, input: Value) -> Result<Value> {
+    async fn execute(&self, input: Value, _ctx: ExecutionContext) -> Result<Value> {
         Ok(serde_json::json!({ "echo": input }))
     }
 }

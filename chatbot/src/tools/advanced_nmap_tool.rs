@@ -3,6 +3,8 @@ use serde_json::Value;
 
 use crate::services::advanced_nmap_scan;
 use crate::Tool;
+use crate::ExecutionContext;
+use crate::api::nmap::NmapStreamEvent;
 
 /// Advanced Nmap tool with comprehensive options
 pub struct AdvancedNmapTool;
@@ -125,7 +127,7 @@ impl Tool for AdvancedNmapTool {
         })
     }
 
-    async fn execute(&self, input: Value) -> Result<Value> {
+    async fn execute(&self, input: Value, ctx: ExecutionContext) -> Result<Value> {
         let target = input
             .get("target")
             .and_then(|v| v.as_str())
@@ -147,24 +149,82 @@ impl Tool for AdvancedNmapTool {
         let flag_a = input.get("flag_a").and_then(|v| v.as_bool()).unwrap_or(false);
         let stealth_options = input.get("stealth_options");
 
-        advanced_nmap_scan::advanced_nmap_scan(
-            target,
-            timing,
-            scan_type,
-            ports,
-            service_detection,
-            os_detection,
-            scripts,
-            output_format,
-            aggressive,
-            traceroute,
-            flag_o,
-            flag_sc,
-            flag_sv,
-            flag_traceroute,
-            flag_a,
-            stealth_options,
-        ).await
+        if ctx.progress_token().is_some() {
+            let mut rx = advanced_nmap_scan::advanced_nmap_scan_stream(
+                target,
+                timing,
+                scan_type,
+                ports,
+                service_detection,
+                os_detection,
+                scripts,
+                output_format,
+                aggressive,
+                traceroute,
+                flag_o,
+                flag_sc,
+                flag_sv,
+                flag_traceroute,
+                flag_a,
+                stealth_options,
+            ).await?;
+
+            let mut progress = 0.0f64;
+            let mut lines: Vec<String> = Vec::new();
+
+            while let Some(ev) = rx.recv().await {
+                match ev {
+                    NmapStreamEvent::Ready(ready) => {
+                        let msg = ready
+                            .get("message")
+                            .and_then(|m| m.as_str())
+                            .unwrap_or("nmap stream ready")
+                            .to_string();
+                        ctx.notify_progress(progress, None, Some(msg)).await;
+                    }
+                    NmapStreamEvent::Output(o) => {
+                        progress += 1.0;
+                        let line = format!("[{} {}] {}", o.timestamp, o.stream, o.line);
+                        lines.push(line.clone());
+                        ctx.notify_progress(progress, None, Some(line)).await;
+                    }
+                    NmapStreamEvent::Done(done) => {
+                        progress += 1.0;
+                        ctx.notify_progress(progress, None, Some("nmap completed".to_string())).await;
+                        return Ok(serde_json::json!({
+                            "target": target,
+                            "raw_output": lines.join("\n"),
+                            "done": done
+                        }));
+                    }
+                }
+            }
+
+            Ok(serde_json::json!({
+                "target": target,
+                "raw_output": lines.join("\n"),
+                "warning": "stream ended before done event"
+            }))
+        } else {
+            advanced_nmap_scan::advanced_nmap_scan(
+                target,
+                timing,
+                scan_type,
+                ports,
+                service_detection,
+                os_detection,
+                scripts,
+                output_format,
+                aggressive,
+                traceroute,
+                flag_o,
+                flag_sc,
+                flag_sv,
+                flag_traceroute,
+                flag_a,
+                stealth_options,
+            ).await
+        }
     }
 }
 
@@ -207,7 +267,7 @@ impl Tool for QuickScanTool {
         })
     }
 
-    async fn execute(&self, input: Value) -> Result<Value> {
+    async fn execute(&self, input: Value, ctx: ExecutionContext) -> Result<Value> {
         let target = input
             .get("target")
             .and_then(|v| v.as_str())
@@ -216,7 +276,45 @@ impl Tool for QuickScanTool {
         let scan_type = input.get("scan_type").and_then(|v| v.as_str()).unwrap_or("common_ports");
         let timing = input.get("timing").and_then(|v| v.as_str()).unwrap_or("T4");
 
-        advanced_nmap_scan::quick_scan(target, scan_type, timing).await
+        if ctx.progress_token().is_some() {
+            let mut rx = advanced_nmap_scan::quick_scan_stream(target, scan_type, timing).await?;
+            let mut progress = 0.0f64;
+            let mut lines: Vec<String> = Vec::new();
+            while let Some(ev) = rx.recv().await {
+                match ev {
+                    NmapStreamEvent::Ready(ready) => {
+                        let msg = ready
+                            .get("message")
+                            .and_then(|m| m.as_str())
+                            .unwrap_or("nmap stream ready")
+                            .to_string();
+                        ctx.notify_progress(progress, None, Some(msg)).await;
+                    }
+                    NmapStreamEvent::Output(o) => {
+                        progress += 1.0;
+                        let line = format!("[{} {}] {}", o.timestamp, o.stream, o.line);
+                        lines.push(line.clone());
+                        ctx.notify_progress(progress, None, Some(line)).await;
+                    }
+                    NmapStreamEvent::Done(done) => {
+                        progress += 1.0;
+                        ctx.notify_progress(progress, None, Some("nmap completed".to_string())).await;
+                        return Ok(serde_json::json!({
+                            "target": target,
+                            "raw_output": lines.join("\n"),
+                            "done": done
+                        }));
+                    }
+                }
+            }
+            Ok(serde_json::json!({
+                "target": target,
+                "raw_output": lines.join("\n"),
+                "warning": "stream ended before done event"
+            }))
+        } else {
+            advanced_nmap_scan::quick_scan(target, scan_type, timing).await
+        }
     }
 }
 
@@ -269,7 +367,7 @@ impl Tool for StealthScanTool {
         })
     }
 
-    async fn execute(&self, input: Value) -> Result<Value> {
+    async fn execute(&self, input: Value, ctx: ExecutionContext) -> Result<Value> {
         let target = input
             .get("target")
             .and_then(|v| v.as_str())
@@ -280,7 +378,51 @@ impl Tool for StealthScanTool {
         let use_decoys = input.get("use_decoys").and_then(|v| v.as_bool()).unwrap_or(true);
         let fragment_packets = input.get("fragment_packets").and_then(|v| v.as_bool()).unwrap_or(false);
 
-        advanced_nmap_scan::stealth_scan(target, stealth_level, scan_type, use_decoys, fragment_packets).await
+        if ctx.progress_token().is_some() {
+            let mut rx = advanced_nmap_scan::stealth_scan_stream(
+                target,
+                stealth_level,
+                scan_type,
+                use_decoys,
+                fragment_packets,
+            ).await?;
+            let mut progress = 0.0f64;
+            let mut lines: Vec<String> = Vec::new();
+            while let Some(ev) = rx.recv().await {
+                match ev {
+                    NmapStreamEvent::Ready(ready) => {
+                        let msg = ready
+                            .get("message")
+                            .and_then(|m| m.as_str())
+                            .unwrap_or("nmap stream ready")
+                            .to_string();
+                        ctx.notify_progress(progress, None, Some(msg)).await;
+                    }
+                    NmapStreamEvent::Output(o) => {
+                        progress += 1.0;
+                        let line = format!("[{} {}] {}", o.timestamp, o.stream, o.line);
+                        lines.push(line.clone());
+                        ctx.notify_progress(progress, None, Some(line)).await;
+                    }
+                    NmapStreamEvent::Done(done) => {
+                        progress += 1.0;
+                        ctx.notify_progress(progress, None, Some("nmap completed".to_string())).await;
+                        return Ok(serde_json::json!({
+                            "target": target,
+                            "raw_output": lines.join("\n"),
+                            "done": done
+                        }));
+                    }
+                }
+            }
+            Ok(serde_json::json!({
+                "target": target,
+                "raw_output": lines.join("\n"),
+                "warning": "stream ended before done event"
+            }))
+        } else {
+            advanced_nmap_scan::stealth_scan(target, stealth_level, scan_type, use_decoys, fragment_packets).await
+        }
     }
 }
 
@@ -316,7 +458,7 @@ impl Tool for ComprehensiveScanTool {
         })
     }
 
-    async fn execute(&self, input: Value) -> Result<Value> {
+    async fn execute(&self, input: Value, ctx: ExecutionContext) -> Result<Value> {
         let target = input
             .get("target")
             .and_then(|v| v.as_str())
@@ -324,7 +466,45 @@ impl Tool for ComprehensiveScanTool {
 
         let include_vuln = input.get("include_vuln").and_then(|v| v.as_bool()).unwrap_or(false);
 
-        advanced_nmap_scan::comprehensive_scan(target, include_vuln).await
+        if ctx.progress_token().is_some() {
+            let mut rx = advanced_nmap_scan::comprehensive_scan_stream(target, include_vuln).await?;
+            let mut progress = 0.0f64;
+            let mut lines: Vec<String> = Vec::new();
+            while let Some(ev) = rx.recv().await {
+                match ev {
+                    NmapStreamEvent::Ready(ready) => {
+                        let msg = ready
+                            .get("message")
+                            .and_then(|m| m.as_str())
+                            .unwrap_or("nmap stream ready")
+                            .to_string();
+                        ctx.notify_progress(progress, None, Some(msg)).await;
+                    }
+                    NmapStreamEvent::Output(o) => {
+                        progress += 1.0;
+                        let line = format!("[{} {}] {}", o.timestamp, o.stream, o.line);
+                        lines.push(line.clone());
+                        ctx.notify_progress(progress, None, Some(line)).await;
+                    }
+                    NmapStreamEvent::Done(done) => {
+                        progress += 1.0;
+                        ctx.notify_progress(progress, None, Some("nmap completed".to_string())).await;
+                        return Ok(serde_json::json!({
+                            "target": target,
+                            "raw_output": lines.join("\n"),
+                            "done": done
+                        }));
+                    }
+                }
+            }
+            Ok(serde_json::json!({
+                "target": target,
+                "raw_output": lines.join("\n"),
+                "warning": "stream ended before done event"
+            }))
+        } else {
+            advanced_nmap_scan::comprehensive_scan(target, include_vuln).await
+        }
     }
 }
 
@@ -361,7 +541,7 @@ impl Tool for NetworkDiscoveryTool {
         })
     }
 
-    async fn execute(&self, input: Value) -> Result<Value> {
+    async fn execute(&self, input: Value, ctx: ExecutionContext) -> Result<Value> {
         let subnet = input
             .get("subnet")
             .and_then(|v| v.as_str())
@@ -369,6 +549,44 @@ impl Tool for NetworkDiscoveryTool {
 
         let timing = input.get("timing").and_then(|v| v.as_str()).unwrap_or("T4");
 
-        advanced_nmap_scan::network_discovery(subnet, timing).await
+        if ctx.progress_token().is_some() {
+            let mut rx = advanced_nmap_scan::network_discovery_stream(subnet, timing).await?;
+            let mut progress = 0.0f64;
+            let mut lines: Vec<String> = Vec::new();
+            while let Some(ev) = rx.recv().await {
+                match ev {
+                    NmapStreamEvent::Ready(ready) => {
+                        let msg = ready
+                            .get("message")
+                            .and_then(|m| m.as_str())
+                            .unwrap_or("nmap stream ready")
+                            .to_string();
+                        ctx.notify_progress(progress, None, Some(msg)).await;
+                    }
+                    NmapStreamEvent::Output(o) => {
+                        progress += 1.0;
+                        let line = format!("[{} {}] {}", o.timestamp, o.stream, o.line);
+                        lines.push(line.clone());
+                        ctx.notify_progress(progress, None, Some(line)).await;
+                    }
+                    NmapStreamEvent::Done(done) => {
+                        progress += 1.0;
+                        ctx.notify_progress(progress, None, Some("nmap completed".to_string())).await;
+                        return Ok(serde_json::json!({
+                            "subnet": subnet,
+                            "raw_output": lines.join("\n"),
+                            "done": done
+                        }));
+                    }
+                }
+            }
+            Ok(serde_json::json!({
+                "subnet": subnet,
+                "raw_output": lines.join("\n"),
+                "warning": "stream ended before done event"
+            }))
+        } else {
+            advanced_nmap_scan::network_discovery(subnet, timing).await
+        }
     }
 }

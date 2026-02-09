@@ -1,0 +1,6 @@
+./amass_handlers.go
+./amass_service.go
+./helpers.go
+./main.go
+./openvas_handlers.go
+./openvas_service.go

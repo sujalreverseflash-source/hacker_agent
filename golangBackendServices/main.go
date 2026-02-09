@@ -52,100 +52,11 @@ func scanOpenPortsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Build nmap command with all options
-	var cmdArgs []string
-
-	// Add timing template
-	timingTemplate := req.Timing
-	if timingTemplate == "" {
-		timingTemplate = "T2"
-	}
-	validTimings := map[string]bool{"T0": true, "T1": true, "T2": true, "T3": true, "T4": true, "T5": true}
-	if !validTimings[timingTemplate] {
-		http.Error(w, "invalid timing template. Must be one of: T0, T1, T2, T3, T4, T5", http.StatusBadRequest)
+	cmdArgs, err := buildNmapArgs(req)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	cmdArgs = append(cmdArgs, "-"+timingTemplate)
-
-	// Add scan type
-	if req.ScanType != "" {
-		validScanTypes := map[string]string{
-			"ping":        "-sn",
-			"tcp_syn":     "-sS",
-			"tcp_connect": "-sT",
-			"udp":         "-sU",
-			"tcp_ack":     "-sA",
-			"tcp_fin":     "-sF",
-			"tcp_null":    "-sN",
-			"tcp_xmas":    "-sX",
-		}
-		if scanType, exists := validScanTypes[req.ScanType]; exists {
-			cmdArgs = append(cmdArgs, scanType)
-		}
-	}
-
-	// Add port specification
-	if req.Ports != "" {
-		cmdArgs = append(cmdArgs, "-p", req.Ports)
-	}
-
-	// Add service detection
-	if req.ServiceDetection {
-		cmdArgs = append(cmdArgs, "-sV")
-	}
-
-	// Add OS detection
-	if req.OSDetection {
-		cmdArgs = append(cmdArgs, "-O")
-	}
-
-	// Add script scanning
-	if req.Scripts != "" {
-		cmdArgs = append(cmdArgs, "--script", req.Scripts)
-	}
-
-	// Add output format
-	if req.OutputFormat != "" {
-		validFormats := map[string]string{
-			"xml":       "-oX",
-			"json":      "-oJ",
-			"greppable": "-oG",
-			"all":       "-oA",
-		}
-		if format, exists := validFormats[req.OutputFormat]; exists {
-			cmdArgs = append(cmdArgs, format)
-		}
-	}
-
-	// Add direct Nmap flags
-	if req.FlagO {
-		cmdArgs = append(cmdArgs, "-O")
-	}
-	if req.FlagSC {
-		cmdArgs = append(cmdArgs, "-sC")
-	}
-	if req.FlagSV {
-		cmdArgs = append(cmdArgs, "-sV")
-	}
-	if req.FlagTraceroute {
-		cmdArgs = append(cmdArgs, "--traceroute")
-	}
-	if req.FlagA {
-		cmdArgs = append(cmdArgs, "-A")
-	}
-
-	// Add aggressive scan options (-A flag) - for backward compatibility
-	if req.Aggressive && !req.FlagA {
-		cmdArgs = append(cmdArgs, "-A")
-	}
-
-	// Add traceroute separately (in case user wants it without -A)
-	if req.Traceroute && !req.FlagTraceroute && !req.Aggressive && !req.FlagA {
-		cmdArgs = append(cmdArgs, "--traceroute")
-	}
-
-	// Add target
-	cmdArgs = append(cmdArgs, req.Target)
 
 	// Build command
 	cmd := exec.Command("nmap", cmdArgs...)
@@ -173,6 +84,9 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/scan-open-ports", scanOpenPortsHandler)
+	mux.HandleFunc("/scan-open-ports/stream", scanOpenPortsStreamHandler)
+	mux.HandleFunc("/amass/enum", amassEnumHandler)
+	mux.Handle("/amass/version", amassVersionHandler(NewAmassServiceFromEnv()))
 
 	// Modular OpenVAS APIs.
 	openVASService := NewOpenVASServiceFromEnv()
@@ -182,6 +96,7 @@ func main() {
 	mux.Handle("/openvas/tasks", openVASCreateTaskHandler(openVASService))
 	mux.Handle("/openvas/tasks/start", openVASStartTaskHandler(openVASService))
 	mux.Handle("/openvas/tasks/status", openVASTaskStatusHandler(openVASService))
+	mux.Handle("/openvas/tasks/progress", openVASTaskProgressStreamHandler(openVASService))
 	mux.Handle("/openvas/reports", openVASGetReportHandler(openVASService))
 
 	addr := ":8080"

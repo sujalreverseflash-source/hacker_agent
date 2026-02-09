@@ -3,6 +3,7 @@ use serde_json::Value;
 
 use crate::services::openvas_get_version;
 use crate::Tool;
+use crate::ExecutionContext;
 
 /// Tool that fetches the OpenVAS/GVM version via the Go backend.
 pub struct OpenVASGetVersionTool;
@@ -24,7 +25,7 @@ impl Tool for OpenVASGetVersionTool {
         })
     }
 
-    async fn execute(&self, _input: Value) -> Result<Value> {
+    async fn execute(&self, _input: Value, _ctx: ExecutionContext) -> Result<Value> {
         openvas_get_version::openvas_get_version().await
     }
 }

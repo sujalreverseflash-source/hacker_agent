@@ -7,6 +7,7 @@ mod openvas_create_task_tool;
 mod openvas_start_task_tool;
 mod openvas_task_status_tool;
 mod openvas_get_report_tool;
+mod openvas_wait_for_task_tool;
 mod simple_echo_tool;
 
 use crate::ToolRegistry;
@@ -27,5 +28,6 @@ pub fn register_all_tools(registry: &mut ToolRegistry) {
     registry.register(openvas_start_task_tool::OpenVASStartTaskTool);
     registry.register(openvas_task_status_tool::OpenVASTaskStatusTool);
     registry.register(openvas_get_report_tool::OpenVASGetReportTool);
+    registry.register(openvas_wait_for_task_tool::OpenVASWaitForTaskTool);
 }
 

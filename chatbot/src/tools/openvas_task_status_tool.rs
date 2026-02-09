@@ -3,6 +3,7 @@ use serde_json::Value;
 
 use crate::services::openvas_task_status;
 use crate::Tool;
+use crate::ExecutionContext;
 
 /// Tool that fetches the current status/details for an existing OpenVAS/GVM
 /// task via the Go backend and returns the raw get_tasks_response XML.
@@ -32,7 +33,7 @@ impl Tool for OpenVASTaskStatusTool {
         })
     }
 
-    async fn execute(&self, input: Value) -> Result<Value> {
+    async fn execute(&self, input: Value, _ctx: ExecutionContext) -> Result<Value> {
         let task_id = input
             .get("task_id")
             .and_then(|v| v.as_str())

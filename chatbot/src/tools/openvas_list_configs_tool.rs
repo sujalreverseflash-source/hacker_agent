@@ -3,6 +3,7 @@ use serde_json::Value;
 
 use crate::services::openvas_list_configs;
 use crate::Tool;
+use crate::ExecutionContext;
 
 /// Tool that lists all available OpenVAS/GVM scan configurations via the Go backend.
 pub struct OpenVASListConfigsTool;
@@ -24,7 +25,7 @@ impl Tool for OpenVASListConfigsTool {
         })
     }
 
-    async fn execute(&self, _input: Value) -> Result<Value> {
+    async fn execute(&self, _input: Value, _ctx: ExecutionContext) -> Result<Value> {
         openvas_list_configs::openvas_list_configs().await
     }
 }

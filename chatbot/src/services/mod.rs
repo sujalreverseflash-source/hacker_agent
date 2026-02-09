@@ -7,4 +7,5 @@ pub mod openvas_create_task;
 pub mod openvas_start_task;
 pub mod openvas_task_status;
 pub mod openvas_get_report;
+pub mod openvas_wait_for_task;
 

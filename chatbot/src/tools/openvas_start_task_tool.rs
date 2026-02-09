@@ -3,6 +3,7 @@ use serde_json::Value;
 
 use crate::services::openvas_start_task;
 use crate::Tool;
+use crate::ExecutionContext;
 
 /// Tool that starts an existing OpenVAS/GVM task via the Go backend
 /// and returns the raw start_task_response XML.
@@ -32,7 +33,7 @@ impl Tool for OpenVASStartTaskTool {
         })
     }
 
-    async fn execute(&self, input: Value) -> Result<Value> {
+    async fn execute(&self, input: Value, _ctx: ExecutionContext) -> Result<Value> {
         let task_id = input
             .get("task_id")
             .and_then(|v| v.as_str())

@@ -3,6 +3,7 @@ use serde_json::Value;
 
 use crate::services::openvas_create_target;
 use crate::Tool;
+use crate::ExecutionContext;
 
 /// Tool that creates a new OpenVAS/GVM target via the Go backend
 /// and returns the created target ID.
@@ -40,7 +41,7 @@ impl Tool for OpenVASCreateTargetTool {
         })
     }
 
-    async fn execute(&self, input: Value) -> Result<Value> {
+    async fn execute(&self, input: Value, _ctx: ExecutionContext) -> Result<Value> {
         let name = input
             .get("name")
             .and_then(|v| v.as_str())

@@ -81,11 +81,23 @@ type openVASTaskStatusRequest struct {
 	TaskID string `json:"task_id"`
 }
 
+// openVASTaskStatusParsed provides a stable, LLM-friendly view of the most
+// important fields from the raw <get_tasks_response/> XML.
+type openVASTaskStatusParsed struct {
+	Status   string   `json:"status,omitempty"`
+	Done     bool     `json:"done,omitempty"`
+	Progress *float64 `json:"progress,omitempty"`
+	Total    *float64 `json:"total,omitempty"`
+	Message  string   `json:"message,omitempty"`
+	ReportID string   `json:"report_id,omitempty"`
+}
+
 // openVASTaskStatusResponse wraps the raw XML response from gvmd when querying
 // task status so that callers can inspect status details if needed.
 type openVASTaskStatusResponse struct {
 	TaskID      string `json:"task_id"`
 	ResponseRaw string `json:"response_raw"`
+	Parsed      *openVASTaskStatusParsed `json:"parsed,omitempty"`
 }
 
 // openVASGetReportRequest is the JSON input for fetching a final report by ID.
@@ -316,10 +328,13 @@ func openVASTaskStatusHandler(svc *OpenVASService) http.Handler {
 			return
 		}
 
+		parsed := parseOpenVASTaskStatus(raw, req.TaskID)
+
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(openVASTaskStatusResponse{
 			TaskID:      req.TaskID,
 			ResponseRaw: raw,
+			Parsed:      parsed,
 		}); err != nil {
 			log.Printf("failed to encode OpenVAS task status response: %v", err)
 		}
